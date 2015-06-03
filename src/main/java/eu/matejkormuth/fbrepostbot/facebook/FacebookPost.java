@@ -87,13 +87,13 @@ public class FacebookPost {
         this.requestedDetails = requestedDetails;
     }
 
-    public void fetchDetails(FacebookAPI api) throws FacebookException {
+    public void fetchDetails(FacebookAPI api, AccessToken pageAccessToken) throws FacebookException {
         if (this.id == 0) {
             throw new IllegalStateException("To fetch post details, the post must have its id.");
         }
 
         JSONObject postDetails = api
-                .createGetRequest()
+                .createGetRequest(pageAccessToken)
                 .url(this.id + "?fields=type,message,status_type,object_id")
                 .send();
 
@@ -111,7 +111,8 @@ public class FacebookPost {
         return objectId != 0;
     }
 
-    public void fetchAttachment(PathHelper pathHelper, FacebookAPI api) throws FacebookException {
+    public void fetchAttachment(PathHelper pathHelper, FacebookAPI api, AccessToken pageAccessToken)
+            throws FacebookException {
         if (this.id == 0) {
             throw new IllegalStateException("To fetch post details, the post must have its id.");
         }
@@ -122,7 +123,7 @@ public class FacebookPost {
 
         // Fetch details about attachement.
         JSONObject postAttachment = api
-                .createGetRequest()
+                .createGetRequest(pageAccessToken)
                 .url(this.objectId + "?fields=source")
                 .send();
 

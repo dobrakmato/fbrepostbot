@@ -39,8 +39,9 @@ public enum PostType {
     }
 
     private static final Map<String, PostType> fbTypeMapping = new HashMap<>();
+
     static {
-        for(PostType pt : values()) {
+        for (PostType pt : values()) {
             fbTypeMapping.put(pt.fbType, pt);
         }
     }

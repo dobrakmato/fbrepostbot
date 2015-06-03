@@ -26,63 +26,85 @@
  */
 package eu.matejkormuth.fbrepostbot.facebook;
 
-import eu.matejkormuth.fbrepostbot.PageRegistry;
-import eu.matejkormuth.fbrepostbot.TargetPage;
+import org.json.JSONArray;
+import org.json.JSONObject;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
-import java.util.Collection;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Set;
 
 public class FacebookAPI {
+    private static final Logger log = LoggerFactory.getLogger(FacebookAPI.class);
     public static final String API_URL = "https://graph.facebook.com/";
 
-    private String accessToken;
+    private AccessToken mainAccessToken;
+    private Map<Long, AccessToken> pageAccessTokens;
 
-    public FacebookAPI(PageRegistry pageRegistry, String accessToken) {
-        this.accessToken = accessToken;
+    public FacebookAPI(String accessToken) throws FacebookException {
+        this.pageAccessTokens = new HashMap<>();
+        this.mainAccessToken = new AccessToken(accessToken);
 
-        checkAccessToken();
-        checkAccessTokenPermissions(pageRegistry.getTargetPages());
-        scheduleAccessTokenRenewal();
+        // Fetch access token details using itself.
+        this.mainAccessToken.fetchDetails(mainAccessToken);
+
+        if (this.mainAccessToken.getType() == AccessToken.Type.APPLICATION_TOKEN) {
+            throw new FacebookException("Can't get access to pages with application token." +
+                    "Please provide user access token with manage_pages permission!");
+        }
     }
 
-    private void checkAccessToken() {
-        if (accessToken == null) {
-            throw new IllegalArgumentException("Access token can't be null!");
-        }
+    public void fetchPageAccessTokens(Set<Long> targetPageIds) throws FacebookException {
+        log.info("Fetching page access tokens valid for this user token...");
+        JSONObject obj = createGetRequest(this.mainAccessToken)
+                .url("me/accounts")
+                .send();
 
-        if (accessToken.isEmpty()) {
-            throw new IllegalArgumentException("Access token can't be empty!");
-        }
+        JSONArray data = obj.getJSONArray("data");
+        for (int i = 0; i < data.length(); i++) {
+            JSONObject account = data.getJSONObject(i);
 
-        try {
-            this.createGetRequest()
-                    .url("debug_token")
-                    .send();
-        } catch (FacebookException e) {
-            // Session has expired on Tuesday, 02-Jun-15 11:00:00 PDT. The current time is Tuesday, 02-Jun-15 14:13:39
-            if (e.getMessage().contains("has expired")) {
-                throw new IllegalArgumentException("Provided access token is invalid: " + e.getMessage());
+            String pageAccessToken = account.getString("access_token");
+            long pageId = account.getLong("id");
+            String pageName = account.getString("name");
+
+            log.info("Access token for page {} was found!", pageName);
+
+            // Request details and save only tokens of pages we need to publish to.
+            if (targetPageIds.contains(pageId)) {
+                AccessToken accessToken = new AccessToken(pageAccessToken);
+                // Fetch details about this access token.
+                accessToken.fetchDetails(this.mainAccessToken);
+                this.pageAccessTokens.put(pageId, accessToken);
             }
         }
     }
 
-    private void scheduleAccessTokenRenewal() {
+    public boolean hasPostPermissions(long pageId) {
+        AccessToken token = pageAccessTokens.get(pageId);
 
+        if (token == null) {
+            return false;
+        }
+
+        return token.hasScope("publish_pages");
     }
 
-    private void checkAccessTokenPermissions(Collection<TargetPage> targetPages) {
-        // Check publish permission for each target page.
-        targetPages.forEach(this::checkPublishSteamPermission);
+    public AccessToken getPageAccessToken(long pageId) {
+        return this.pageAccessTokens.get(pageId);
     }
 
-    private void checkPublishSteamPermission(TargetPage page) {
-
+    public Request createGetRequest(AccessToken token) {
+        return new Request("GET", token.getToken());
     }
 
-    public Request createGetRequest() {
-        return new Request("GET", this.accessToken);
+    public Request createPostRequest(AccessToken token) {
+        return new Request("POST", token.getToken());
     }
 
-    public Request createPostRequest() {
-        return new Request("POST", this.accessToken);
+
+    public AccessToken getMainAccessToken() {
+        return mainAccessToken;
     }
 }

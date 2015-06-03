@@ -55,4 +55,22 @@ public class PageRegistry {
     public Collection<TargetPage> getTargetPages() {
         return Collections.unmodifiableCollection(targetPageList);
     }
+
+    public boolean containsSourcePage(long sourcePageId) {
+        for (SourcePage p : sourcePageList) {
+            if (p.getId() == sourcePageId) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    public boolean containsTargetPage(long targetPageId) {
+        for (TargetPage p : targetPageList) {
+            if (p.getId() == targetPageId) {
+                return true;
+            }
+        }
+        return false;
+    }
 }

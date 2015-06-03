@@ -35,6 +35,10 @@ public class FacebookPage implements JsonSerializable {
     // Check interval in seconds.
     private long checkInterval;
 
+    public FacebookPage() {
+
+    }
+
     public FacebookPage(long id, String username, long checkInterval) {
         this.id = id;
         this.username = username;
@@ -71,5 +75,13 @@ public class FacebookPage implements JsonSerializable {
         this.id = obj.getLong("id");
         this.username = obj.getString("username");
         this.checkInterval = obj.getLong("checkInterval");
+    }
+
+    public void fetchDetails(FacebookAPI api) throws FacebookException {
+        JSONObject details = api.createGetRequest(api.getMainAccessToken())
+                .url(this.id + "?fields=name")
+                .send();
+
+        this.username = details.getString("name");
     }
 }

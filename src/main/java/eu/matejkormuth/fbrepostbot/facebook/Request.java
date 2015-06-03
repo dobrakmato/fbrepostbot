@@ -51,7 +51,7 @@ public class Request {
     }
 
     public Request data(String key, String value) {
-        if(data.isEmpty()) {
+        if (data.isEmpty()) {
             data = key + "=" + value;
         } else {
             data += "&" + key + "=" + value;
@@ -60,7 +60,7 @@ public class Request {
     }
 
     private void appendAccessToken() {
-        if(url.contains("?")) {
+        if (url.contains("?")) {
             url += "&access_token=" + accessToken;
         } else {
             url += "?access_token=" + accessToken;
@@ -78,7 +78,7 @@ public class Request {
             connection.connect();
 
             // Write POST data.
-            if(!data.isEmpty()) {
+            if (!data.isEmpty()) {
                 connection.getOutputStream().write(data.getBytes(Charsets.UTF_8));
             }
 

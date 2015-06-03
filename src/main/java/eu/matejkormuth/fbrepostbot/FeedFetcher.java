@@ -26,10 +26,7 @@
  */
 package eu.matejkormuth.fbrepostbot;
 
-import eu.matejkormuth.fbrepostbot.facebook.FacebookAPI;
-import eu.matejkormuth.fbrepostbot.facebook.FacebookException;
-import eu.matejkormuth.fbrepostbot.facebook.FacebookPage;
-import eu.matejkormuth.fbrepostbot.facebook.FacebookPost;
+import eu.matejkormuth.fbrepostbot.facebook.*;
 import org.json.JSONArray;
 import org.json.JSONObject;
 
@@ -40,10 +37,12 @@ public class FeedFetcher {
 
     private final FacebookPage page;
     private final FacebookAPI api;
+    private final AccessToken pageAccessToken;
 
-    public FeedFetcher(FacebookAPI api, FacebookPage page) {
+    public FeedFetcher(FacebookAPI api, FacebookPage page, AccessToken pageAccessToken) {
         this.api = api;
         this.page = page;
+        this.pageAccessToken = pageAccessToken;
     }
 
     public List<FacebookPost> fetch(int limit) throws FacebookException {
@@ -51,7 +50,7 @@ public class FeedFetcher {
 
         // Download feed.
         JSONObject pageFeed = api
-                .createGetRequest()
+                .createGetRequest(pageAccessToken)
                 .url(page.getId() + "/feed?fields=admin_creator&limit=" + limit)
                 .send();
 

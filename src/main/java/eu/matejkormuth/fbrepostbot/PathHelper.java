@@ -42,6 +42,12 @@ public class PathHelper {
     private String publicPathUrl;
 
     public PathHelper(Path basePath, Path publicPath, String publicPathUrl) {
+
+        log.info("Initializing PathHelper...");
+        log.info("Data path: {}", basePath);
+        log.info("Public folder path: {}", publicPath);
+        log.info("Public folder URL: {}", publicPathUrl);
+
         this.basePath = basePath;
         this.publicPath = publicPath;
 
@@ -89,6 +95,14 @@ public class PathHelper {
 
     public String getPublicUrl(String s) {
         return publicPathUrl + "/" + s;
+    }
+
+    public Path getSourcePageJsonPath(long sourcePageId) {
+        return getPath("pages", String.valueOf(sourcePageId), "page.json");
+    }
+
+    public Path getTargetPageJsonPath(long targetPageId) {
+        return getPath("pages", String.valueOf(targetPageId), "page.json");
     }
 
     public static class NamingConventions {

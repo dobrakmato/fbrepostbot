@@ -26,13 +26,24 @@
  */
 package eu.matejkormuth.fbrepostbot;
 
+import com.google.common.base.Charsets;
 import com.google.common.eventbus.EventBus;
+import eu.matejkormuth.fbrepostbot.facebook.AccessToken;
 import eu.matejkormuth.fbrepostbot.facebook.FacebookAPI;
+import eu.matejkormuth.fbrepostbot.facebook.FacebookException;
+import eu.matejkormuth.fbrepostbot.facebook.FacebookPage;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.text.SimpleDateFormat;
-import java.util.Date;
+import java.util.*;
+import java.util.concurrent.TimeUnit;
 
 public class Bootstrap {
 
@@ -49,13 +60,236 @@ public class Bootstrap {
     private PathHelper pathHelper;
     private PageRegistry pageRegistry;
 
+    private static final String MAIN_CONF = "main.conf";
+    private static final String SEPARATOR = "->";
+    private static final long DEFAULT_CHECK_INTERVAL = 5 * 60;
+
+    private void shutdown() {
+        // TODO: Add way of safe shutdown.
+        log.info("Safe shutdown not yet supported!");
+        log.info("Terminating...");
+        System.exit(0);
+    }
+
     private void boot() {
-        // Load main config.
+        log.info("Booting up...");
 
-        // Parse re-post configuration folders.
+        // Create objects.
+        scheduler = new Scheduler();
+        eventBus = new EventBus();
+        pageRegistry = new PageRegistry();
 
-        // Set up scheduling and start services.
+        // Load access key and connect to facebook.
+        try {
+            // Load main conf and initialize PathHelper.
+            Properties mainConf = initPathHelperAndMainConf();
 
+            // Init facebook api from access config.
+            initFacebookAPI(mainConf);
 
+            // Resolve repost mappings.
+            List<String> lines = Files.readAllLines(pathHelper.getRepostConfPath());
+            Set<Long> targetPageIds = new HashSet<>();
+            Map<Long, Set<Long>> filterMappings = new HashMap<>();
+
+            // First pass: gather unique pages, build mappings.
+            initRepostFirstPass(lines, targetPageIds, filterMappings);
+
+            // Finish FacebookAPI initialization by acquiring all page access tokens.
+            fetchPageAccessTokens(targetPageIds);
+
+            // Second pass: build objects.
+            initRepostSecondPass(lines, filterMappings);
+
+            // Set up scheduling.
+            for (SourcePage page : pageRegistry.getSourcePages()) {
+                scheduler.periodic(page::check, page.getCheckInterval(), TimeUnit.SECONDS);
+            }
+        } catch (Exception e) {
+            log.info("Exception occurred during initialization: ", e);
+            System.exit(1);
+        }
+    }
+
+    private void initRepostSecondPass(List<String> lines, Map<Long, Set<Long>> filterMappings)
+            throws IOException, FacebookException {
+        for (String line : lines) {
+            long sourcePageId = Long.valueOf(line.split(SEPARATOR)[0].trim());
+            long targetPageId = Long.valueOf(line.split(SEPARATOR)[1].trim());
+
+            // Load source page if not loaded.
+            initSourcePage(sourcePageId);
+
+            // Load target page if not loaded.
+            initTargetPage(filterMappings, targetPageId);
+        }
+    }
+
+    private void initTargetPage(Map<Long, Set<Long>> filterMappings, long targetPageId)
+            throws IOException, FacebookException {
+        if (!pageRegistry.containsTargetPage(targetPageId)) {
+            FacebookPage facebookPage;
+            // Try to load, if not found, create with default check interval.
+            facebookPage = loadTargetFacebookPage(targetPageId);
+
+            // Create new cache for this page.
+            PageCache pageCache = new PageCache(facebookPage, pathHelper);
+            // Create filter.
+            PostFilter pageFilter = new PostFilter(filterMappings.get(targetPageId));
+            AccessToken pageAccessToken = facebookAPI.getPageAccessToken(targetPageId);
+
+            TargetPage page = new TargetPage(facebookAPI, eventBus, facebookPage, pageCache, pageFilter,
+                    pathHelper, pageAccessToken);
+            pageRegistry.add(page);
+        }
+    }
+
+    private FacebookPage loadTargetFacebookPage(long targetPageId) throws IOException, FacebookException {
+        FacebookPage facebookPage;
+        if (Files.exists(pathHelper.getTargetPageJsonPath(targetPageId))) {
+            log.info("Loading page {}...", targetPageId);
+            String pageJson = new String(Files.readAllBytes(pathHelper.getTargetPageJsonPath(targetPageId)),
+                    Charsets.UTF_8);
+
+            // Build facebookPage object from cache.
+            facebookPage = new FacebookPage();
+            facebookPage.deserialize(pageJson);
+
+        } else {
+            // Create new page.
+            log.info("Creating new page with id {} and default check interval.", targetPageId);
+
+            facebookPage = new FacebookPage(targetPageId, null, DEFAULT_CHECK_INTERVAL);
+            facebookPage.fetchDetails(facebookAPI);
+            Files.write(pathHelper.getTargetPageJsonPath(targetPageId),
+                    facebookPage.serialize().getBytes(Charsets.UTF_8));
+        }
+        return facebookPage;
+    }
+
+    private void initSourcePage(long sourcePageId) throws IOException, FacebookException {
+        if (!pageRegistry.containsSourcePage(sourcePageId)) {
+            FacebookPage facebookPage;
+            // Try to load, if not found, create with default check interval.
+            facebookPage = loadSourceFacebookPage(sourcePageId);
+
+            // Create new cache for this page.
+            PageCache pageCache = new PageCache(facebookPage, pathHelper);
+
+            // We use main access token for source pages.
+            // There are no special permissions needed to be able to read their stream.
+            AccessToken pageAccessToken = facebookAPI.getMainAccessToken();
+
+            SourcePage page = new SourcePage(facebookAPI, eventBus, facebookPage, pageCache,
+                    pathHelper, pageAccessToken);
+            pageRegistry.add(page);
+        }
+    }
+
+    private FacebookPage loadSourceFacebookPage(long sourcePageId) throws IOException, FacebookException {
+        FacebookPage facebookPage;
+        if (Files.exists(pathHelper.getSourcePageJsonPath(sourcePageId))) {
+            log.info("Loading page {}...", sourcePageId);
+            String pageJson = new String(Files.readAllBytes(pathHelper.getSourcePageJsonPath(sourcePageId)),
+                    Charsets.UTF_8);
+
+            // Build facebookPage object from cache.
+            facebookPage = new FacebookPage();
+            facebookPage.deserialize(pageJson);
+        } else {
+            // Create new page.
+            log.info("Creating new page with id {} and default check interval.", sourcePageId);
+
+            facebookPage = new FacebookPage(sourcePageId, null, DEFAULT_CHECK_INTERVAL);
+            facebookPage.fetchDetails(facebookAPI);
+            // Save created page file.
+            Files.write(pathHelper.getSourcePageJsonPath(sourcePageId),
+                    facebookPage.serialize().getBytes(Charsets.UTF_8));
+        }
+        return facebookPage;
+    }
+
+    private void fetchPageAccessTokens(Set<Long> targetPageIds) {
+        try {
+            facebookAPI.fetchPageAccessTokens(targetPageIds);
+        } catch (FacebookException e) {
+            log.error("Failed to fetch page access tokens!", e);
+            System.exit(3);
+        }
+    }
+
+    private void initRepostFirstPass(List<String> lines, Set<Long> targetPageIds,
+                                     Map<Long, Set<Long>> filterMappings) {
+        try {
+            for (String line : lines) {
+                // {source-id} -> {target-page}
+                long sourcePageId = Long.valueOf(line.split(SEPARATOR)[0].trim());
+                long targetPageId = Long.valueOf(line.split(SEPARATOR)[1].trim());
+
+                // Check for cyclic mapping.
+                if (sourcePageId == targetPageId) {
+                    throw new IllegalStateException("Source page can't be the same page as target page!");
+                }
+
+                // Add target page to targets set.
+                targetPageIds.add(targetPageId);
+                // Add to mapping.
+                if (filterMappings.containsKey(targetPageId)) {
+                    filterMappings.get(targetPageId).add(sourcePageId);
+                } else {
+                    Set<Long> set = new HashSet<>();
+                    set.add(sourcePageId);
+                    filterMappings.put(targetPageId, set);
+                }
+            }
+        } catch (Exception e) {
+            log.error("Can't parse repost config.", e);
+        }
+    }
+
+    private void initFacebookAPI(Properties mainConf) throws IOException {
+        Properties accessConf = new Properties();
+        accessConf.load(new FileInputStream(pathHelper.getAccessConfPath().toFile()));
+
+        if (mainConf.getProperty("accessToken", "invalid").equals("invalid")) {
+            log.error("accessToken must be set in access config!");
+            System.exit(1);
+        }
+
+        String accessToken = accessConf.getProperty("accessToken");
+
+        try {
+            facebookAPI = new FacebookAPI(accessToken);
+        } catch (FacebookException e) {
+            log.info("Can't create FacebookAPI (log in to facebook)!", e);
+            System.exit(2);
+        }
+    }
+
+    private Properties initPathHelperAndMainConf() throws IOException {
+        Properties mainConf = new Properties();
+        mainConf.load(new FileInputStream(new File("./" + MAIN_CONF)));
+
+        if (mainConf.getProperty("dataPath", "invalid").equals("invalid")) {
+            log.error("dataPath must be set in " + MAIN_CONF + "!");
+            System.exit(1);
+        }
+
+        if (mainConf.getProperty("publicPath", "invalid").equals("invalid")) {
+            log.error("publicPath must be set in " + MAIN_CONF + "!");
+            System.exit(1);
+        }
+
+        if (mainConf.getProperty("publicPathUrl", "invalid").equals("invalid")) {
+            log.error("publicPathUrl must be set in " + MAIN_CONF + "!");
+            System.exit(1);
+        }
+
+        Path dataPath = Paths.get(mainConf.getProperty("dataPath"));
+        Path publicPath = Paths.get(mainConf.getProperty("publicPath"));
+        String publicPathUrl = mainConf.getProperty("publicPathUrl");
+
+        pathHelper = new PathHelper(dataPath, publicPath, publicPathUrl);
+        return mainConf;
     }
 }

@@ -26,10 +26,7 @@
  */
 package eu.matejkormuth.fbrepostbot;
 
-import eu.matejkormuth.fbrepostbot.facebook.FacebookAPI;
-import eu.matejkormuth.fbrepostbot.facebook.FacebookException;
-import eu.matejkormuth.fbrepostbot.facebook.FacebookPage;
-import eu.matejkormuth.fbrepostbot.facebook.FacebookPost;
+import eu.matejkormuth.fbrepostbot.facebook.*;
 import org.json.JSONObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -40,10 +37,12 @@ public class FeedPublisher {
 
     private final FacebookPage targetPage;
     private final FacebookAPI api;
+    private final AccessToken pageAccessToken;
 
-    public FeedPublisher(FacebookAPI api, FacebookPage targetPage) {
+    public FeedPublisher(FacebookAPI api, FacebookPage targetPage, AccessToken pageAccessToken) {
         this.api = api;
         this.targetPage = targetPage;
+        this.pageAccessToken = pageAccessToken;
     }
 
     public void publish(PathHelper pathHelper, FacebookPost facebookPost) throws FacebookException {
@@ -66,7 +65,7 @@ public class FeedPublisher {
         String message = facebookPost.getMessage();
 
         JSONObject result = api
-                .createPostRequest()
+                .createPostRequest(pageAccessToken)
                 .url(targetPage.getId() + "/photos")
                 .data("url", publicPhotoUrl)
                 .data("message", message)

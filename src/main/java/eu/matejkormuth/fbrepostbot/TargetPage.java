@@ -30,10 +30,7 @@ import com.google.common.eventbus.EventBus;
 import com.google.common.eventbus.Subscribe;
 import eu.matejkormuth.fbrepostbot.events.IncomingPostEvent;
 import eu.matejkormuth.fbrepostbot.events.OutgoingPostEvent;
-import eu.matejkormuth.fbrepostbot.facebook.FacebookAPI;
-import eu.matejkormuth.fbrepostbot.facebook.FacebookException;
-import eu.matejkormuth.fbrepostbot.facebook.FacebookPage;
-import eu.matejkormuth.fbrepostbot.facebook.FacebookPost;
+import eu.matejkormuth.fbrepostbot.facebook.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -52,13 +49,13 @@ public class TargetPage {
     private final PathHelper pathHelper;
 
     public TargetPage(FacebookAPI api, EventBus eventBus, FacebookPage page, PageCache cache, PostFilter filter,
-                      PathHelper pathHelper) {
+                      PathHelper pathHelper, AccessToken pageAccessToken) {
         this.eventBus = eventBus;
         this.page = page;
         this.cache = cache;
         this.filter = filter;
         this.pathHelper = pathHelper;
-        this.feedPublisher = new FeedPublisher(api, page);
+        this.feedPublisher = new FeedPublisher(api, page, pageAccessToken);
         // TODO: Add more configuration to PostFactory.
         this.facebookPostFactory = new FacebookPostFactory();
 

@@ -28,10 +28,7 @@ package eu.matejkormuth.fbrepostbot;
 
 import com.google.common.eventbus.EventBus;
 import eu.matejkormuth.fbrepostbot.events.IncomingPostEvent;
-import eu.matejkormuth.fbrepostbot.facebook.FacebookAPI;
-import eu.matejkormuth.fbrepostbot.facebook.FacebookException;
-import eu.matejkormuth.fbrepostbot.facebook.FacebookPage;
-import eu.matejkormuth.fbrepostbot.facebook.FacebookPost;
+import eu.matejkormuth.fbrepostbot.facebook.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -47,14 +44,16 @@ public class SourcePage {
     private final FeedFetcher feedFetcher;
     private final PageCache cache;
     private final PathHelper pathHelper;
+    private final AccessToken pageAccessToken;
 
-    public SourcePage(FacebookAPI api, EventBus eventBus, FacebookPage page, PageCache pageCache, PathHelper pathHelper) {
+    public SourcePage(FacebookAPI api, EventBus eventBus, FacebookPage page, PageCache pageCache, PathHelper pathHelper, AccessToken pageAccessToken) {
         this.eventBus = eventBus;
         this.api = api;
         this.page = page;
         this.cache = pageCache;
         this.pathHelper = pathHelper;
-        this.feedFetcher = new FeedFetcher(api, page);
+        this.feedFetcher = new FeedFetcher(api, page, pageAccessToken);
+        this.pageAccessToken = pageAccessToken;
     }
 
     public void check() {
@@ -77,7 +76,7 @@ public class SourcePage {
             // Request additional details about post if it's new.
             if (!post.hasDetails()) {
                 try {
-                    post.fetchDetails(api);
+                    post.fetchDetails(api, pageAccessToken);
                 } catch (FacebookException e) {
                     log.error("Can't fetch details about post " + post.getId() + " of page " + page.getUsername() + "!", e);
                     return;
@@ -88,7 +87,7 @@ public class SourcePage {
                 if (post.hasAttachment()) {
                     try {
                         // Fetch and save (cache) attachment.
-                        post.fetchAttachment(pathHelper, api);
+                        post.fetchAttachment(pathHelper, api, pageAccessToken);
                     } catch (FacebookException e) {
                         log.error("Can't fetch attachment of post " + post.getId() + " of page " + page.getUsername() + "!", e);
                         return;
@@ -116,5 +115,9 @@ public class SourcePage {
 
     public long getId() {
         return this.page.getId();
+    }
+
+    public long getCheckInterval() {
+        return page.getCheckInterval();
     }
 }

@@ -26,15 +26,14 @@
  */
 package eu.matejkormuth.fbrepostbot;
 
-import java.util.Arrays;
-import java.util.List;
+import java.util.Collection;
 
 public class PostFilter {
 
-    private List<Long> sourcePageIdList;
+    private Collection<Long> sourcePageIdList;
 
-    public PostFilter(Long... sourcePageIds) {
-        sourcePageIdList = Arrays.asList(sourcePageIds);
+    public PostFilter(Collection<Long> sourcePageIds) {
+        sourcePageIdList = sourcePageIds;
     }
 
     public boolean isRelevant(CachedPost incomingPost) {

@@ -29,11 +29,15 @@ package eu.matejkormuth.fbrepostbot;
 import eu.matejkormuth.fbrepostbot.facebook.*;
 import org.json.JSONArray;
 import org.json.JSONObject;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
 import java.util.List;
 
 public class FeedFetcher {
+
+    private static final Logger log = LoggerFactory.getLogger(FeedFetcher.class);
 
     private final FacebookPage page;
     private final FacebookAPI api;
@@ -49,18 +53,19 @@ public class FeedFetcher {
         ArrayList<FacebookPost> posts = new ArrayList<>();
 
         // Download feed.
+        log.info("Sending request to facebook api...");
         JSONObject pageFeed = api
                 .createGetRequest(pageAccessToken)
-                .url(page.getId() + "/feed?fields=admin_creator&limit=" + limit)
+                .url(page.getId() + "/feed?fields=created_time,id&limit=" + limit)
                 .send();
 
         JSONArray data = pageFeed.getJSONArray("data");
-        for (int i = 0; i < data.length(); i++) {
+        int length = data.length();
+        for (int i = 0; i < length; i++) {
             JSONObject postJsonObj = data.getJSONObject(i);
-
+            log.info("Creating FacebookPost object {}", postJsonObj.getString("id"));
             FacebookPost post = new FacebookPost();
-            post.setId(postJsonObj.getLong("id"));
-
+            post.setId(postJsonObj.getString("id"));
             posts.add(post);
         }
 

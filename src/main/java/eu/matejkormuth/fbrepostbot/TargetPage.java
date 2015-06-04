@@ -60,13 +60,15 @@ public class TargetPage {
         this.facebookPostFactory = new FacebookPostFactory();
 
         // Register listener.
+        log.info("Registering events for target page {}...", this.getId());
         this.eventBus.register(this);
     }
 
     @Subscribe
-    private void incomingPostListener(final IncomingPostEvent event) {
+    public void incomingPostListener(final IncomingPostEvent event) {
         // Filter out posts from source pages we do not subscribe.
         if (filter.isRelevant(event.getPost())) {
+            log.info("Publishing post {} to page {}...", event.getPost().getOriginalPost().getId(), this.page.getUsername());
             FacebookPost facebookPost = facebookPostFactory.create(event.getPost());
             try {
                 feedPublisher.publish(pathHelper, facebookPost);
@@ -76,7 +78,7 @@ public class TargetPage {
 
                 // Create new cached post in local cache.
                 try {
-                    CachedPost cachedPost = this.cache.add(facebookPost);
+                    CachedPost cachedPost = this.cache.add(facebookPost, this);
                     cachedPost.setTargetPage(this);
 
                     // Dispatch new OutgoingPostEvent

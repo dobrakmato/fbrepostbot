@@ -61,6 +61,8 @@ public class FeedPublisher {
         String publicPhotoUrl = pathHelper.getPublicUrl(
                 PathHelper.NamingConventions.getPhotoName(facebookPost.getObjectId()));
 
+        log.info("Public path to photo: {}", publicPhotoUrl);
+
         // TODO: Make a way to override post message.
         String message = facebookPost.getMessage();
 

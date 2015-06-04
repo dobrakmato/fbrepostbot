@@ -52,11 +52,12 @@ public class PathHelper {
         this.publicPath = publicPath;
 
         if (publicPathUrl.endsWith("/")) {
-            // Trim last slash -> substring from index zero to index (length - 1) - 1
-            this.publicPathUrl = publicPathUrl.substring(0, publicPathUrl.length() - 2);
+            this.publicPathUrl = publicPathUrl.substring(0, publicPathUrl.length() - 1);
         } else {
             this.publicPathUrl = publicPathUrl;
         }
+
+        log.info("Public path url is: {}", this.publicPathUrl);
 
         checkPublicPathUrlValidity();
     }
@@ -70,11 +71,11 @@ public class PathHelper {
     }
 
     public Path getRepostConfPath() {
-        return getPath("repost.conf");
+        return getPath(NamingConventions.REPOST_CONF_FILENAME);
     }
 
     public Path getAccessConfPath() {
-        return getPath("access.conf");
+        return getPath(NamingConventions.ACCESS_CONF_FILENAME);
     }
 
     public Path getPageCachePath(long pageId) {
@@ -106,6 +107,9 @@ public class PathHelper {
     }
 
     public static class NamingConventions {
+        public static final String REPOST_CONF_FILENAME = "repost.conf";
+        public static final String ACCESS_CONF_FILENAME = "access.conf";
+
         public static String getPhotoName(long objectId) {
             return objectId + ".jpg";
         }

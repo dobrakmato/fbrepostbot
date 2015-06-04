@@ -40,8 +40,12 @@ public class CachedPost implements JsonSerializable {
 
     public CachedPost(FacebookPost originalPost, SourcePage sourcePage, TargetPage targetPage, boolean published) {
         this.originalPost = originalPost;
-        this.sourcePageId = sourcePage.getId();
-        this.targetPageId = targetPage.getId();
+        if(sourcePage != null) {
+            this.sourcePageId = sourcePage.getId();
+        }
+        if(targetPage != null) {
+            this.targetPageId = targetPage.getId();
+        }
         this.published = published;
     }
 
@@ -91,7 +95,7 @@ public class CachedPost implements JsonSerializable {
         JSONObject obj = new JSONObject(contents);
 
         FacebookPost post = new FacebookPost();
-        post.setId(obj.getLong("id"));
+        post.setId(obj.getString("id"));
         post.setMessage(obj.getString("message"));
         post.setType(PostType.valueOf(obj.getString("type")));
         post.setObjectId(obj.getLong("objectId"));
@@ -99,7 +103,7 @@ public class CachedPost implements JsonSerializable {
 
         this.originalPost = post;
         this.published = obj.getBoolean("published");
-        this.sourcePageId = obj.getLong("sourccePageId");
+        this.sourcePageId = obj.getLong("sourcePageId");
         this.targetPageId = obj.getLong("targetPageId");
     }
 }

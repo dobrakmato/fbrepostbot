@@ -52,16 +52,36 @@ public class PageCache {
         return contains(post.getId());
     }
 
-    public boolean contains(long postId) {
+    public boolean contains(String postId) {
         return Files.exists(pathHelper.getPostPath(postId));
     }
 
-    public CachedPost add(FacebookPost post) throws IOException {
+    // Called from SourcePage
+    public CachedPost add(FacebookPost post, SourcePage sourcePage) throws IOException {
         // Create cached post from facebook post.
         CachedPost cachedPost = transformer.apply(post);
+        // Set source page of this post.
+        cachedPost.setSourcePage(sourcePage);
 
         // Save it to cache.
         String json = cachedPost.serialize();
+        Files.createDirectories(pathHelper.getPostPath(post.getId()).getParent());
+        Files.write(pathHelper.getPostPath(post.getId()), json.getBytes(Charsets.UTF_8));
+
+        // Return CachedPost object.
+        return cachedPost;
+    }
+
+    // Called from TargetPage
+    public CachedPost add(FacebookPost post, TargetPage targetPage) throws IOException {
+        // Create cached post from facebook post.
+        CachedPost cachedPost = transformer.apply(post);
+        // Set source page of this post.
+        cachedPost.setTargetPage(targetPage);
+
+        // Save it to cache.
+        String json = cachedPost.serialize();
+        Files.createDirectories(pathHelper.getPostPath(post.getId()).getParent());
         Files.write(pathHelper.getPostPath(post.getId()), json.getBytes(Charsets.UTF_8));
 
         // Return CachedPost object.
@@ -83,7 +103,7 @@ public class PageCache {
             return this.basePath.resolve(Paths.get(first, more));
         }
 
-        public Path getPostPath(long postId) {
+        public Path getPostPath(String postId) {
             return getPath("posts", postId + ".json");
         }
     }

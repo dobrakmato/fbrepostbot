@@ -103,7 +103,11 @@ public class Bootstrap {
 
             // Set up scheduling.
             for (SourcePage page : pageRegistry.getSourcePages()) {
-                scheduler.periodic(page::check, page.getCheckInterval(), TimeUnit.SECONDS);
+                // When an exception is thrown in scheduled task it will not be propagated unless we
+                // explicitly call .get() method on ScheduledFuture. The whole execution will stop without
+                // any message. So we call get() to make ScheduledExecutorService propagate exceptions from
+                // task to main thread and stop application.
+                scheduler.periodic(page::check, page.getCheckInterval(), TimeUnit.SECONDS).get();
             }
         } catch (Exception e) {
             log.info("Exception occurred during initialization: ", e);
@@ -161,6 +165,7 @@ public class Bootstrap {
 
             facebookPage = new FacebookPage(targetPageId, null, DEFAULT_CHECK_INTERVAL);
             facebookPage.fetchDetails(facebookAPI);
+            Files.createDirectories(pathHelper.getTargetPageJsonPath(targetPageId).getParent());
             Files.write(pathHelper.getTargetPageJsonPath(targetPageId),
                     facebookPage.serialize().getBytes(Charsets.UTF_8));
         }
@@ -203,6 +208,7 @@ public class Bootstrap {
             facebookPage = new FacebookPage(sourcePageId, null, DEFAULT_CHECK_INTERVAL);
             facebookPage.fetchDetails(facebookAPI);
             // Save created page file.
+            Files.createDirectories(pathHelper.getSourcePageJsonPath(sourcePageId).getParent());
             Files.write(pathHelper.getSourcePageJsonPath(sourcePageId),
                     facebookPage.serialize().getBytes(Charsets.UTF_8));
         }
@@ -251,7 +257,7 @@ public class Bootstrap {
         Properties accessConf = new Properties();
         accessConf.load(new FileInputStream(pathHelper.getAccessConfPath().toFile()));
 
-        if (mainConf.getProperty("accessToken", "invalid").equals("invalid")) {
+        if (accessConf.getProperty("accessToken", "invalid").equals("invalid")) {
             log.error("accessToken must be set in access config!");
             System.exit(1);
         }

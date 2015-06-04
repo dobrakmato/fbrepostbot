@@ -41,17 +41,17 @@ public class FacebookPost {
 
     private static final Logger log = LoggerFactory.getLogger(FacebookPost.class);
 
-    private long id;
+    private String id = "";
     private PostType type;
     private String message;
     private long objectId;
     private boolean requestedDetails = false;
 
-    public long getId() {
+    public String getId() {
         return id;
     }
 
-    public void setId(long id) {
+    public void setId(String id) {
         this.id = id;
     }
 
@@ -88,7 +88,7 @@ public class FacebookPost {
     }
 
     public void fetchDetails(FacebookAPI api, AccessToken pageAccessToken) throws FacebookException {
-        if (this.id == 0) {
+        if (this.id.isEmpty()) {
             throw new IllegalStateException("To fetch post details, the post must have its id.");
         }
 
@@ -97,9 +97,11 @@ public class FacebookPost {
                 .url(this.id + "?fields=type,message,status_type,object_id")
                 .send();
 
-        this.message = postDetails.getString("message");
+        if(postDetails.has("message")) {
+            this.message = postDetails.getString("message");
+        }
         this.objectId = postDetails.getLong("object_id");
-        this.type = PostType.byFacebookType("type");
+        this.type = PostType.byFacebookType(postDetails.getString("type"));
         this.requestedDetails = true;
     }
 
@@ -113,7 +115,7 @@ public class FacebookPost {
 
     public void fetchAttachment(PathHelper pathHelper, FacebookAPI api, AccessToken pageAccessToken)
             throws FacebookException {
-        if (this.id == 0) {
+        if (this.id.isEmpty()) {
             throw new IllegalStateException("To fetch post details, the post must have its id.");
         }
 
@@ -143,6 +145,7 @@ public class FacebookPost {
         try {
             log.info("Downloading post attachment to {}.jpg...", this.objectId);
             URL website = new URL(photoUrl);
+            Files.createDirectories(targetFile.getParent());
             Files.copy(website.openStream(), targetFile, StandardCopyOption.REPLACE_EXISTING);
         } catch (Exception e) {
             throw new FacebookException("Error during photo download: ", e);

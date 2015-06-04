@@ -71,6 +71,7 @@ public class AccessToken {
                 throw new FacebookException("Provided access token is invalid: " + e.getMessage());
             }
 
+            log.error("An error occurred: ", e);
         }
 
         if (obj == null) {

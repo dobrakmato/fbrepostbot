@@ -28,17 +28,31 @@ package eu.matejkormuth.fbrepostbot.facebook;
 
 import com.google.common.base.Charsets;
 import com.google.common.io.CharStreams;
+import org.apache.http.HttpEntity;
+import org.apache.http.NameValuePair;
+import org.apache.http.client.entity.UrlEncodedFormEntity;
+import org.apache.http.client.methods.CloseableHttpResponse;
+import org.apache.http.client.methods.HttpGet;
+import org.apache.http.client.methods.HttpPost;
+import org.apache.http.client.methods.HttpRequestBase;
+import org.apache.http.impl.client.CloseableHttpClient;
+import org.apache.http.impl.client.HttpClients;
+import org.apache.http.message.BasicNameValuePair;
+import org.apache.http.util.EntityUtils;
 import org.json.JSONObject;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.InputStreamReader;
-import java.net.HttpURLConnection;
-import java.net.URL;
+import java.util.ArrayList;
+import java.util.List;
 
 public class Request {
+    private static final Logger log = LoggerFactory.getLogger(Request.class);
     private final String method;
     private final String accessToken;
     private String url = "";
-    private String data = "";
+    private List<NameValuePair> postData;
 
     Request(String method, String accessToken) {
         this.method = method;
@@ -51,11 +65,10 @@ public class Request {
     }
 
     public Request data(String key, String value) {
-        if (data.isEmpty()) {
-            data = key + "=" + value;
-        } else {
-            data += "&" + key + "=" + value;
+        if (this.postData == null) {
+            this.postData = new ArrayList<>();
         }
+        this.postData.add(new BasicNameValuePair(key, value));
         return this;
     }
 
@@ -72,30 +85,46 @@ public class Request {
             // Append access token to URL.
             this.appendAccessToken();
 
-            URL url = new URL(this.url);
-            HttpURLConnection connection = (HttpURLConnection) url.openConnection();
-            connection.setRequestMethod(this.method);
-            connection.connect();
-
-            // Write POST data.
-            if (!data.isEmpty()) {
-                connection.getOutputStream().write(data.getBytes(Charsets.UTF_8));
+            // Create HttpClient.
+            CloseableHttpClient httpclient = HttpClients.createDefault();
+            HttpRequestBase request;
+            CloseableHttpResponse response = null;
+            // Create request.
+            if (this.method == "GET") {
+                request = new HttpGet(this.url);
+            } else if (this.method == "POST") {
+                request = new HttpPost(this.url);
+                ((HttpPost) request).setEntity(new UrlEncodedFormEntity(this.postData, Charsets.UTF_8));
+            } else {
+                throw new IllegalStateException("Unsupported method " + this.method);
             }
 
             // Read response.
-            String response = CharStreams.toString(new InputStreamReader(connection.getInputStream(), Charsets.UTF_8));
-            JSONObject obj = new JSONObject(response);
+            try {
+                response = httpclient.execute(request);
+                HttpEntity entity = response.getEntity();
 
-            // Check for exceptions.
-            if (obj.has("error")) {
-                JSONObject error = obj.getJSONObject("error");
+                String responseString = CharStreams.toString(new InputStreamReader(entity.getContent(),
+                        Charsets.UTF_8));
+                JSONObject obj = new JSONObject(responseString);
 
-                throw new FacebookException("API Exception: " + error.getString("type") + ": " + error.getString("message"));
+                // Check for errors.
+                if (obj.has("error")) {
+                    JSONObject error = obj.getJSONObject("error");
+                    throw new FacebookException("API Exception: " + error.getString("type") + ": "
+                            + error.getString("message"));
+                }
+
+                // Ensure the entity is fully consumed.
+                EntityUtils.consume(entity);
+
+                return obj;
+            } finally {
+                httpclient.close();
+                if (response != null) {
+                    response.close();
+                }
             }
-
-            // Return result object.
-            return obj;
-
         } catch (Exception e) {
             throw new FacebookException("Nested exception: ", e);
         }

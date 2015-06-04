@@ -33,6 +33,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.util.List;
 
 public class SourcePage {
 
@@ -62,10 +63,9 @@ public class SourcePage {
         log.info("Fetching last {} posts from page {}.", limit, page.getUsername());
         // Fetch all posts and offer them to cache.
         try {
-            this.feedFetcher
-                    .fetch(limit)
-                    .stream() // TODO: Check whether this could be replaced with parallel stream.
-                    .forEach(this::offerToCache);
+            List<FacebookPost> postList = this.feedFetcher.fetch(limit);
+            log.info("Caching downloaded posts...");
+            postList.forEach(this::offerToCache);
         } catch (FacebookException e) {
             log.error("Can't fetch last " + limit + " posts from page " + page.getUsername(), e);
         }
@@ -73,9 +73,11 @@ public class SourcePage {
 
     private void offerToCache(FacebookPost post) {
         if (!this.cache.contains(post)) {
+            log.info("Post {} does not exists in cache, downloading...", post.getId());
             // Request additional details about post if it's new.
             if (!post.hasDetails()) {
                 try {
+                    log.info("Fetching details about post {}...", post.getId());
                     post.fetchDetails(api, pageAccessToken);
                 } catch (FacebookException e) {
                     log.error("Can't fetch details about post " + post.getId() + " of page " + page.getUsername() + "!", e);
@@ -87,6 +89,7 @@ public class SourcePage {
                 if (post.hasAttachment()) {
                     try {
                         // Fetch and save (cache) attachment.
+                        log.info("Fetching attachment of post {}...", post.getId());
                         post.fetchAttachment(pathHelper, api, pageAccessToken);
                     } catch (FacebookException e) {
                         log.error("Can't fetch attachment of post " + post.getId() + " of page " + page.getUsername() + "!", e);
@@ -97,8 +100,7 @@ public class SourcePage {
 
             // Add FacebookPost to cache.
             try {
-                CachedPost cachedPost = this.cache.add(post);
-                cachedPost.setSourcePage(this);
+                CachedPost cachedPost = this.cache.add(post, this);
                 log.info("Post {} from page {} cached successfully!", post.getId(), page.getUsername());
 
                 // Dispatch event about this post.
@@ -106,6 +108,8 @@ public class SourcePage {
             } catch (IOException e) {
                 log.error("Can't save (cache) post " + post.getId() + " from page " + page.getUsername(), e);
             }
+        } else {
+            log.info("Post {} is already cached.", post.getId());
         }
     }
 

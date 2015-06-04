@@ -58,7 +58,7 @@ public class SourcePage {
     }
 
     public void check() {
-        int limit = 10;
+        int limit = 4;
 
         log.info("Fetching last {} posts from page {}.", limit, page.getUsername());
         // Fetch all posts and offer them to cache.

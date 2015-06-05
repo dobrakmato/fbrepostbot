@@ -43,6 +43,7 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.text.SimpleDateFormat;
 import java.util.*;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 
 public class Bootstrap {
@@ -107,12 +108,24 @@ public class Bootstrap {
                 // explicitly call .get() method on ScheduledFuture. The whole execution will stop without
                 // any message. So we call get() to make ScheduledExecutorService propagate exceptions from
                 // task to main thread and stop application.
-                scheduler.periodic(page::check, page.getCheckInterval(), TimeUnit.SECONDS).get();
+                Thread thread = new Thread(() -> {
+                    try {
+                        scheduler.periodic(page::check, page.getCheckInterval(), TimeUnit.SECONDS).get();
+                    } catch (InterruptedException e) {
+                        log.error("ExceptionPropagationThread was interrupted.", e);
+                    } catch (ExecutionException e) {
+                        log.error("Exception in ExceptionPropagationThread: ", e);
+                    }
+                }, "ExceptionPropagationThread-Page-" + page.getUsername());
+                thread.setDaemon(false);
+                thread.start();
             }
         } catch (Exception e) {
             log.info("Exception occurred during initialization: ", e);
             System.exit(1);
         }
+
+        log.info("Application initialized!");
     }
 
     private void initRepostSecondPass(List<String> lines, Map<Long, Set<Long>> filterMappings)

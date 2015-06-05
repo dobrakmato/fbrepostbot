@@ -30,6 +30,11 @@ import java.util.HashMap;
 import java.util.Map;
 
 public enum PostType {
+    UNSUPPORTED("unsupported"),
+    LINK("link"),
+    STATUS("status"),
+    VIDEO("video"),
+    OFFER("offer"),
     PHOTO("photo");
 
     private final String fbType;
@@ -47,6 +52,10 @@ public enum PostType {
     }
 
     public static PostType byFacebookType(String type) {
-        return fbTypeMapping.get(type);
+        PostType postType = fbTypeMapping.get(type);
+        if (postType == null) {
+            return UNSUPPORTED;
+        }
+        return postType;
     }
 }

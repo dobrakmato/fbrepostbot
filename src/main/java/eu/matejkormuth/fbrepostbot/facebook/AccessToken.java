@@ -31,7 +31,9 @@ import org.json.JSONObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.List;
 
 public class AccessToken {
@@ -93,6 +95,9 @@ public class AccessToken {
 
         this.appId = data.getLong("app_id");
         this.expires = data.getLong("expires_at");
+
+        log.info("This access token expires at: {}", new SimpleDateFormat().format(new Date(this.expires * 1000)));
+
         this.scopes = new ArrayList<>();
 
         JSONArray scopes = data.getJSONArray("scopes");

@@ -97,10 +97,13 @@ public class FacebookPost {
                 .url(this.id + "?fields=type,message,status_type,object_id")
                 .send();
 
-        if(postDetails.has("message")) {
+        if (postDetails.has("message")) {
             this.message = postDetails.getString("message");
         }
-        this.objectId = postDetails.getLong("object_id");
+
+        if (postDetails.has("object_id")) {
+            this.objectId = postDetails.getLong("object_id");
+        }
         this.type = PostType.byFacebookType(postDetails.getString("type"));
         this.requestedDetails = true;
     }

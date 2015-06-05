@@ -26,6 +26,7 @@
  */
 package eu.matejkormuth.fbrepostbot;
 
+import com.google.common.base.Preconditions;
 import eu.matejkormuth.fbrepostbot.facebook.FacebookPost;
 import org.json.JSONObject;
 
@@ -39,6 +40,8 @@ public class CachedPost implements JsonSerializable {
     }
 
     public CachedPost(FacebookPost originalPost, SourcePage sourcePage, TargetPage targetPage, boolean published) {
+        Preconditions.checkNotNull(originalPost);
+
         this.originalPost = originalPost;
         if(sourcePage != null) {
             this.sourcePageId = sourcePage.getId();

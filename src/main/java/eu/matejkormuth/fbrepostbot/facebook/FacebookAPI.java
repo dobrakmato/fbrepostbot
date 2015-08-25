@@ -37,9 +37,14 @@ import java.util.Set;
 
 public class FacebookAPI {
     private static final Logger log = LoggerFactory.getLogger(FacebookAPI.class);
-    public static final String API_URL = "https://graph.facebook.com/";
 
+    // This is built on Graph API 2.3, using other version may break the application
+    // so that's why we stick with explicitly specified API version.
+    public static final String API_URL = "https://graph.facebook.com/v2.3/";
+
+    // Main access token.
     private AccessToken mainAccessToken;
+    // Access tokens of pages.
     private Map<Long, AccessToken> pageAccessTokens;
 
     public FacebookAPI(String accessToken) throws FacebookException {
